@@ -4,6 +4,10 @@ import {
   formatDiagnosticsReport,
   runDiagnostics
 } from "./diagnostics.js";
+import {
+  parseWebsiteTestCommand,
+  runWebsiteTest
+} from "./tools/websiteTestService.js";
 
 function getLineConfig() {
   return {
@@ -93,6 +97,10 @@ function isSelfRepairCommand(text) {
   return normalized === "/self-repair" || normalized === "自我修正";
 }
 
+function isWebsiteTestCommand(text) {
+  return parseWebsiteTestCommand(text) !== null;
+}
+
 async function replyDiagnostics(event, channelAccessToken) {
   const diagnostics = runDiagnostics();
   await replyLineMessage(
@@ -115,10 +123,24 @@ async function replySelfRepairStatus(event, channelAccessToken) {
   );
 }
 
+async function replyWebsiteTestResult(event, channelAccessToken, command) {
+  const result = await runWebsiteTest({
+    url: command.url,
+    expectedTitle: command.expectedTitle
+  });
+
+  await replyLineMessage(
+    event.replyToken,
+    buildReplyMessages(result.summary),
+    channelAccessToken
+  );
+}
+
 async function handleTextMessageEvent(event, channelAccessToken) {
   const userMessage = event.message?.text;
   const sessionId = getSessionIdFromEvent(event);
   const { adminLineUserId } = getLineConfig();
+  const websiteTestCommand = parseWebsiteTestCommand(userMessage);
 
   if (isAdminEvent(event, adminLineUserId) && isSelfCheckCommand(userMessage)) {
     await replyDiagnostics(event, channelAccessToken);
@@ -127,6 +149,18 @@ async function handleTextMessageEvent(event, channelAccessToken) {
 
   if (isAdminEvent(event, adminLineUserId) && isSelfRepairCommand(userMessage)) {
     await replySelfRepairStatus(event, channelAccessToken);
+    return;
+  }
+
+  if (
+    websiteTestCommand &&
+    (!adminLineUserId || isAdminEvent(event, adminLineUserId))
+  ) {
+    await replyWebsiteTestResult(
+      event,
+      channelAccessToken,
+      websiteTestCommand
+    );
     return;
   }
 
@@ -174,7 +208,7 @@ export async function handleLineWebhook(req, res) {
         await replyLineMessage(
           event.replyToken,
           buildReplyMessages(
-            "\u4f60\u597d\uff0c\u6211\u662f OpenClaw\u3002\u4f60\u53ef\u4ee5\u76f4\u63a5\u544a\u8a34\u6211\u60f3\u627e\u54ea\u4e00\u5340\u3001\u54ea\u7a2e\u6599\u7406\u3001\u5e7e\u4f4d\u3001\u54ea\u4e00\u5929\uff0c\u6211\u6703\u5e6b\u4f60\u67e5\u9910\u5ef3\u548c\u6574\u7406\u8a02\u4f4d\u9700\u6c42\u3002"
+            "\u4f60\u597d\uff0c\u6211\u662f OpenClaw\u3002\u4f60\u53ef\u4ee5\u76f4\u63a5\u544a\u8a34\u6211\u60f3\u627e\u54ea\u4e00\u5340\u3001\u54ea\u7a2e\u6599\u7406\u3001\u5e7e\u4f4d\u3001\u54ea\u4e00\u5929\uff0c\u6211\u6703\u5e6b\u4f60\u67e5\u9910\u5ef3\u548c\u6574\u7406\u8a02\u4f4d\u9700\u6c42\u3002\u7ba1\u7406\u8005\u4e5f\u53ef\u4ee5\u50b3 /self-check \u6216 /test-site https://example.com"
           ),
           channelAccessToken
         );

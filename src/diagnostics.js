@@ -1,4 +1,5 @@
 import { listReservations } from "./tools/restaurantService.js";
+import { listWebsiteTestRuns } from "./tools/websiteTestService.js";
 
 const startedAt = new Date();
 
@@ -34,6 +35,7 @@ export function runDiagnostics() {
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor((Date.now() - startedAt.getTime()) / 1000),
     reservationCount: listReservations().length,
+    websiteTestRunCount: listWebsiteTestRuns().length,
     envChecks,
     selfHealing: {
       enabled: canSelfHeal,
@@ -49,7 +51,8 @@ export function formatDiagnosticsReport(diagnostics) {
     "OpenClaw 自我檢查結果",
     `時間: ${diagnostics.timestamp}`,
     `運行秒數: ${diagnostics.uptimeSeconds}`,
-    `訂位請求數: ${diagnostics.reservationCount}`
+    `訂位請求數: ${diagnostics.reservationCount}`,
+    `網站測試數: ${diagnostics.websiteTestRunCount}`
   ];
 
   const requiredIssues = diagnostics.envChecks.filter(

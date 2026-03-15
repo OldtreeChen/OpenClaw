@@ -158,6 +158,23 @@ GitHub Actions 需要的 secrets：
 - GitHub Actions 執行 `CI`
 - Railway 從 GitHub 自動部署
 
+## LINE 網頁測試
+
+目前管理指令已支援用 LINE 觸發網站測試：
+
+```text
+/test-site https://example.com
+/test-site https://example.com title=Example Domain
+```
+
+測試內容包含：
+
+- 頁面是否可開啟
+- HTTP 狀態碼
+- 頁面標題是否符合預期
+- 是否有 console error
+- 是否有 page error
+
 ## 參考
 
 - OpenAI 官方建議新專案使用 Responses API：[Migrate to the Responses API](https://platform.openai.com/docs/guides/responses-vs-chat-completions)

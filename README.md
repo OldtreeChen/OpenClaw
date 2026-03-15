@@ -128,6 +128,30 @@ powershell -ExecutionPolicy Bypass -File .\scripts\git-sync.ps1 -Message "your c
 
 前提是你已經設定好 git repository 與 remote。
 
+## AI QA / DevOps
+
+這個 repo 現在包含第一版 AI QA / DevOps 骨架：
+
+- `agents/codex_tasks.md`
+- `.github/workflows/ci.yml`
+- `.github/workflows/railway-deploy.yml`
+- `tests/`
+- `docs/system-overview.md`
+
+本地檢查指令：
+
+```bash
+npm run ci:check
+```
+
+GitHub Actions 需要的 secrets：
+
+- `RAILWAY_TOKEN`
+- `RAILWAY_PROJECT_ID`
+- `RAILWAY_SERVICE_ID`
+
+目前 Railway deploy workflow 只有在 secrets 存在時才會執行。
+
 ## 參考
 
 - OpenAI 官方建議新專案使用 Responses API：[Migrate to the Responses API](https://platform.openai.com/docs/guides/responses-vs-chat-completions)

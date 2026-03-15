@@ -6,7 +6,10 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "test": "node --test",
+    "docs:generate": "node scripts/generate-docs.js",
+    "ci:check": "npm run test && npm run docs:generate"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

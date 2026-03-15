@@ -5,7 +5,10 @@ import {
   runDiagnostics
 } from "./diagnostics.js";
 import {
+  isLoginReportCommand,
+  parseNaturalWebsiteTestCommand,
   parseWebsiteTestCommand,
+  runConfiguredLoginReport,
   runWebsiteTest
 } from "./tools/websiteTestService.js";
 
@@ -136,11 +139,23 @@ async function replyWebsiteTestResult(event, channelAccessToken, command) {
   );
 }
 
+async function replyLoginReport(event, channelAccessToken) {
+  const result = await runConfiguredLoginReport();
+
+  await replyLineMessage(
+    event.replyToken,
+    buildReplyMessages(result.summary),
+    channelAccessToken
+  );
+}
+
 async function handleTextMessageEvent(event, channelAccessToken) {
   const userMessage = event.message?.text;
   const sessionId = getSessionIdFromEvent(event);
   const { adminLineUserId } = getLineConfig();
-  const websiteTestCommand = parseWebsiteTestCommand(userMessage);
+  const websiteTestCommand =
+    parseWebsiteTestCommand(userMessage) ||
+    parseNaturalWebsiteTestCommand(userMessage);
 
   if (isAdminEvent(event, adminLineUserId) && isSelfCheckCommand(userMessage)) {
     await replyDiagnostics(event, channelAccessToken);
@@ -149,6 +164,14 @@ async function handleTextMessageEvent(event, channelAccessToken) {
 
   if (isAdminEvent(event, adminLineUserId) && isSelfRepairCommand(userMessage)) {
     await replySelfRepairStatus(event, channelAccessToken);
+    return;
+  }
+
+  if (
+    isLoginReportCommand(userMessage) &&
+    (!adminLineUserId || isAdminEvent(event, adminLineUserId))
+  ) {
+    await replyLoginReport(event, channelAccessToken);
     return;
   }
 

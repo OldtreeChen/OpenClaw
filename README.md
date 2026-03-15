@@ -175,6 +175,44 @@ GitHub Actions 需要的 secrets：
 - 是否有 console error
 - 是否有 page error
 
+也支援較口語的說法，例如：
+
+```text
+幫我測試網站 https://example.com
+幫我檢查這個網頁 https://example.com 標題 Example Domain
+```
+
+## 登入後測試報告
+
+如果你有設定登入測試環境變數，LINE 可以直接產生登入後功能測試報告：
+
+```text
+/login-report
+幫我做登入後功能測試報告
+幫我測一下登入後流程
+```
+
+目前登入報告會執行：
+
+- 開啟登入頁
+- 輸入帳號密碼
+- 送出登入
+- 驗證成功 selector 或成功文字
+- 可選擇再開啟登入後頁面
+
+需要先設定：
+
+- `LOGIN_TEST_BASE_URL`
+- `LOGIN_TEST_LOGIN_URL`
+- `LOGIN_TEST_USERNAME`
+- `LOGIN_TEST_PASSWORD`
+- `LOGIN_TEST_USERNAME_SELECTOR`
+- `LOGIN_TEST_PASSWORD_SELECTOR`
+- `LOGIN_TEST_SUBMIT_SELECTOR`
+- 選配：`LOGIN_TEST_SUCCESS_SELECTOR`
+- 選配：`LOGIN_TEST_SUCCESS_TEXT`
+- 選配：`LOGIN_TEST_POST_LOGIN_PATH`
+
 ## 參考
 
 - OpenAI 官方建議新專案使用 Responses API：[Migrate to the Responses API](https://platform.openai.com/docs/guides/responses-vs-chat-completions)

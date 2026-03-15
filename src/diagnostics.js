@@ -20,7 +20,13 @@ export function runDiagnostics() {
     checkEnv("LINE_CHANNEL_ACCESS_TOKEN"),
     checkEnv("ADMIN_LINE_USER_ID", false),
     checkEnv("GITHUB_REPO", false),
-    checkEnv("GITHUB_TOKEN", false)
+    checkEnv("GITHUB_TOKEN", false),
+    checkEnv("LOGIN_TEST_BASE_URL", false),
+    checkEnv("LOGIN_TEST_USERNAME", false),
+    checkEnv("LOGIN_TEST_PASSWORD", false),
+    checkEnv("LOGIN_TEST_USERNAME_SELECTOR", false),
+    checkEnv("LOGIN_TEST_PASSWORD_SELECTOR", false),
+    checkEnv("LOGIN_TEST_SUBMIT_SELECTOR", false)
   ];
 
   const missingRequired = envChecks.filter(

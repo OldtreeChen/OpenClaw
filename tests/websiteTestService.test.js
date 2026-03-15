@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import {
+  isLoginReportCommand,
+  parseNaturalWebsiteTestCommand,
   parseWebsiteTestCommand,
   runWebsiteTest
 } from "../src/tools/websiteTestService.js";
@@ -28,6 +30,23 @@ test("parseWebsiteTestCommand parses url and expected title", () => {
     url: "https://example.com",
     expectedTitle: "Example Domain"
   });
+});
+
+test("parseNaturalWebsiteTestCommand parses Chinese request", () => {
+  const command = parseNaturalWebsiteTestCommand(
+    "幫我測試網站 https://example.com 標題 Example Domain"
+  );
+
+  assert.deepEqual(command, {
+    url: "https://example.com",
+    expectedTitle: "Example Domain"
+  });
+});
+
+test("isLoginReportCommand matches natural language login report request", () => {
+  assert.equal(isLoginReportCommand("幫我做登入後功能測試報告"), true);
+  assert.equal(isLoginReportCommand("/login-report"), true);
+  assert.equal(isLoginReportCommand("幫我測試網站 https://example.com"), false);
 });
 
 test("runWebsiteTest passes for a clean page", async () => {

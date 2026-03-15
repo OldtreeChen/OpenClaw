@@ -75,7 +75,7 @@ function buildLoginReport(result) {
   }
 
   if (result.consoleErrors.length > 0) {
-    lines.push(`Console errors: ${result.consoleErrors.length}`);
+    lines.push(`Console warnings: ${result.consoleErrors.length}`);
   }
 
   if (result.pageErrors.length > 0) {
@@ -361,6 +361,7 @@ export async function runConfiguredLoginReport() {
       error: null
     };
 
+    result.ok = loginSuccess;
     result.summary = buildLoginReport(result);
     websiteTestRuns.unshift(result);
     websiteTestRuns.splice(10);

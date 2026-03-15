@@ -134,7 +134,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\git-sync.ps1 -Message "your c
 
 - `agents/codex_tasks.md`
 - `.github/workflows/ci.yml`
-- `.github/workflows/railway-deploy.yml`
 - `tests/`
 - `docs/system-overview.md`
 
@@ -146,11 +145,18 @@ npm run ci:check
 
 GitHub Actions 需要的 secrets：
 
-- `RAILWAY_TOKEN`
-- `RAILWAY_PROJECT_ID`
-- `RAILWAY_SERVICE_ID`
+目前建議使用 Railway 的 GitHub 直連部署：
 
-目前 Railway deploy workflow 只有在 secrets 存在時才會執行。
+1. 在 Railway service 設定中 `Connect Repo`
+2. 選擇 `OldtreeChen/OpenClaw`
+3. branch 使用 `main`
+4. 建議開啟 `Wait for CI`
+
+這樣流程會變成：
+
+- push 到 GitHub
+- GitHub Actions 執行 `CI`
+- Railway 從 GitHub 自動部署
 
 ## 參考
 

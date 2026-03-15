@@ -27,7 +27,6 @@ const tools = [
     type: "function",
     name: "search_restaurants",
     description: "Search restaurants by city, area, cuisine, budget, date, party size, or keywords.",
-    strict: true,
     parameters: {
       type: "object",
       properties: {
@@ -52,7 +51,6 @@ const tools = [
     type: "function",
     name: "check_availability",
     description: "Check if a restaurant has available times for a date and optional time.",
-    strict: true,
     parameters: {
       type: "object",
       properties: {
@@ -69,7 +67,6 @@ const tools = [
     type: "function",
     name: "create_reservation_request",
     description: "Create a reservation request after required details are collected.",
-    strict: true,
     parameters: {
       type: "object",
       properties: {
@@ -89,7 +86,6 @@ const tools = [
     type: "function",
     name: "list_reservations",
     description: "List all reservation requests created in the current demo server.",
-    strict: true,
     parameters: {
       type: "object",
       properties: {},

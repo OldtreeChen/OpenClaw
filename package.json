@@ -11,9 +11,11 @@
     "test": "node --test \"tests/*.test.js\"",
     "docs:generate": "node scripts/generate-docs.js",
     "ci:check": "npm run test && npm run docs:generate",
-    "test:site": "node scripts/run-site-test.js"
+    "test:site": "node scripts/run-site-test.js",
+    "report:service-request": "node scripts/generate-service-request-word-report.js"
   },
   "dependencies": {
+    "docx": "^9.6.1",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "openai": "^6.6.0",

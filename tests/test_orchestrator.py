@@ -127,7 +127,9 @@ def test_run_line_query_builds_actions(monkeypatch):
     monkeypatch.setattr(orchestrator, "run_search_and_probe", fake_run_search_and_probe)
 
     response = asyncio.run(
-        orchestrator.run_line_query(LineWebhookRequest(user_id="u1", message="火鍋", location="台北", party_size=2))
+        orchestrator.run_line_query(
+            LineWebhookRequest(user_id="u1", message="火鍋", location="台北", party_size=2, preferred_time="19:00")
+        )
     )
 
     assert "幫你找了" in response.reply_text
@@ -137,6 +139,49 @@ def test_run_line_query_builds_actions(monkeypatch):
     assert len(response.booking_intents) == 1
     assert response.booking_intents[0].provider == "inline"
     assert response.booking_intents[0].booking_summary_text.startswith("餐廳：Hotpot A")
+
+
+def test_run_line_query_asks_for_cuisine_when_missing():
+    orchestrator.USER_CONTEXT.clear()
+
+    response = asyncio.run(
+        orchestrator.run_line_query(
+            LineWebhookRequest(user_id="u-follow", message="今天晚上想吃點東西", location="台北市", party_size=2)
+        )
+    )
+
+    assert "想吃什麼類型" in response.reply_text
+    assert response.actions == []
+
+
+def test_run_line_query_uses_previous_context_for_follow_up(monkeypatch):
+    orchestrator.USER_CONTEXT.clear()
+
+    async def fake_run_search_and_probe(payload):
+        return SearchAndProbeResponse(
+            query=payload.message,
+            location=payload.location,
+            party_size=payload.party_size,
+            reservation_date=payload.reservation_date or "2026-03-21",
+            preferred_time=payload.preferred_time,
+            results=[],
+        )
+
+    monkeypatch.setattr(orchestrator, "run_search_and_probe", fake_run_search_and_probe)
+
+    first = asyncio.run(
+        orchestrator.run_line_query(
+            LineWebhookRequest(user_id="u-memory", message="信義區 串燒", location="台北市", party_size=2)
+        )
+    )
+    assert "想約什麼時間" in first.reply_text
+
+    second = asyncio.run(
+        orchestrator.run_line_query(
+            LineWebhookRequest(user_id="u-memory", message="明天晚上7點", location="台北市", party_size=2)
+        )
+    )
+    assert "找不到符合條件" in second.reply_text
 
 
 def test_parse_line_message_extracts_common_fields():
@@ -265,3 +310,30 @@ def test_build_line_response_shows_requested_count():
     assert "5. R5" in response.reply_text
     assert len(response.actions) == 5
     assert len(response.booking_intents) == 5
+
+
+def test_build_line_response_includes_recommendation_reason():
+    response = orchestrator.build_line_response(
+        LineWebhookRequest(user_id="u1", message="串燒", location="台北市", party_size=2, limit=1),
+        SearchAndProbeResponse(
+            query="串燒",
+            location="台北市信義區",
+            party_size=2,
+            reservation_date="2026-03-21",
+            preferred_time="19:00",
+            results=[
+                SearchAndProbeItem(
+                    place_id="1",
+                    name="串燒 A",
+                    rating=4.8,
+                    platform="google_maps",
+                    reservation_platform="google_maps",
+                    reservation_url="https://maps.google.com/?cid=1",
+                    availability_status="available",
+                    available_times=["19:00"],
+                )
+            ],
+        ),
+    )
+
+    assert "推薦理由：" in response.reply_text

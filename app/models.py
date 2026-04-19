@@ -11,6 +11,7 @@ class SearchRequest(BaseModel):
     party_size: int = Field(..., ge=1, le=20)
     dining_time: Optional[str] = Field(default=None, description="ISO 8601 datetime string")
     cuisine_type: Optional[str] = None
+    cuisine_tag: Optional[str] = None
     budget_level: Optional[int] = Field(default=None, ge=1, le=4)
     limit: int = Field(default=5, ge=1, le=10)
 

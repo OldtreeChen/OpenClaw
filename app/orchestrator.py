@@ -89,6 +89,12 @@ TIME_PATTERN = re.compile(
 )
 DATE_PATTERN = re.compile(r"(?<!\d)(\d{1,2})/(\d{1,2})(?!\d)")
 COMPACT_TIME_PATTERN = re.compile(r"(?<!\d)([01]?\d|2[0-3])([0-5]\d)(?!\d)")
+USER_CONTEXT: dict[str, "ParsedMessage"] = {}
+FOLLOW_UP_HINTS = {
+    "cuisine": "\u60f3\u5403\u4ec0\u9ebc\u985e\u578b\u7684\u9910\u5ef3\uff1f\u4f8b\u5982\u706b\u934b\u3001\u71d2\u8089\u3001\u4e32\u71d2\u3001\u751f\u9b5a\u7247\u3002",
+    "location": "\u4f60\u60f3\u627e\u54ea\u500b\u5730\u5340\uff1f\u4f8b\u5982\u4fe1\u7fa9\u5340\u3001\u53f0\u5317\u5e02\u3001\u8606\u6d32\u5340\u3002",
+    "time": "\u60f3\u7d04\u4ec0\u9ebc\u6642\u9593\uff1f\u4f8b\u5982\u4eca\u665a 7 \u9ede\u3001\u660e\u5929\u665a\u4e0a 6 \u9ede\u3002",
+}
 
 
 @dataclass
@@ -98,6 +104,14 @@ class ParsedMessage:
     party_size: int
     reservation_date: str
     preferred_time: str | None
+    cuisine_tag: str | None = None
+
+
+def _extract_cuisine_tag(message: str) -> str | None:
+    for keyword in CUISINE_KEYWORDS:
+        if keyword in message:
+            return keyword
+    return None
 
 
 def _now_taipei() -> datetime:
@@ -244,17 +258,33 @@ def _extract_compact_time(message: str, default_time: str | None) -> str | None:
 
 
 def parse_line_message(payload: LineWebhookRequest) -> ParsedMessage:
+    previous = USER_CONTEXT.get(payload.user_id)
     inferred_time = _extract_time(payload.message, payload.preferred_time)
     if inferred_time == payload.preferred_time:
         inferred_time = _extract_compact_time(payload.message, inferred_time)
 
-    return ParsedMessage(
-        query=_extract_query(payload.message, None),
-        location=_extract_location(payload.message, payload.location),
+    cuisine_tag = _extract_cuisine_tag(payload.message) or (previous.cuisine_tag if previous else None)
+    parsed = ParsedMessage(
+        query=_extract_query(payload.message, cuisine_tag),
+        location=_extract_location(payload.message, previous.location if previous else payload.location),
         party_size=_extract_party_size(payload.message, payload.party_size),
-        reservation_date=_extract_date(payload.message, payload.reservation_date),
-        preferred_time=inferred_time,
+        reservation_date=_extract_date(payload.message, previous.reservation_date if previous else payload.reservation_date),
+        preferred_time=inferred_time or (previous.preferred_time if previous else None),
+        cuisine_tag=cuisine_tag,
     )
+    return parsed
+
+
+def _should_ask_follow_up(payload: LineWebhookRequest, parsed: ParsedMessage, has_previous: bool) -> tuple[str, str] | None:
+    explicit_location = any(keyword in payload.message for keyword in LOCATION_KEYWORDS) or bool(payload.location)
+    explicit_time = bool(_extract_time(payload.message, None) or _extract_compact_time(payload.message, None))
+    if not parsed.cuisine_tag:
+        return "cuisine", FOLLOW_UP_HINTS["cuisine"]
+    if not explicit_location and not has_previous:
+        return "location", FOLLOW_UP_HINTS["location"]
+    if not explicit_time and not payload.preferred_time and not has_previous:
+        return "time", FOLLOW_UP_HINTS["time"]
+    return None
 
 
 def _compose_search_payload(payload: SearchAndProbeRequest) -> SearchRequest:
@@ -269,6 +299,7 @@ def _compose_search_payload(payload: SearchAndProbeRequest) -> SearchRequest:
         party_size=payload.party_size,
         dining_time=dining_time,
         cuisine_type=payload.cuisine_type,
+        cuisine_tag=payload.cuisine_type,
         limit=payload.limit,
     )
 
@@ -425,10 +456,19 @@ def build_line_response(payload: LineWebhookRequest, result: SearchAndProbeRespo
         rating_hint = f"{item.rating:.1f}" if item.rating is not None else "-"
         platform_text = PLATFORM_TEXT.get(_best_platform(item), "\u8a02\u4f4d\u9023\u7d50")
         action_url = _best_action_url(item)
+        reason = []
+        if item.rating and item.rating >= 4.5:
+            reason.append("\u9ad8\u8a55\u5206")
+        if item.reservation_platform in {"inline", "eztable", "google_maps"}:
+            reason.append("\u53ef\u76f4\u63a5\u8a02\u4f4d")
+        if item.available_times:
+            reason.append("\u6293\u5230\u5019\u9078\u6642\u6bb5")
+        reason_text = "\uff0c".join(reason) if reason else "\u689d\u4ef6\u76f8\u8fd1"
 
         lines.append(
             f"{idx}. {item.name}\uff5c\u8a55\u5206 {rating_hint}\uff5c{status_text}\uff5c\u8a02\u4f4d: {platform_text}\uff5c\u6642\u6bb5: {time_hint}"
         )
+        lines.append(f"\u63a8\u85a6\u7406\u7531\uff1a{reason_text}")
 
         if action_url:
             actions.append(LineAction(label=f"{idx}. {item.name[:12]}", url=action_url))
@@ -460,7 +500,14 @@ def build_line_response(payload: LineWebhookRequest, result: SearchAndProbeRespo
 
 
 async def run_line_query(payload: LineWebhookRequest) -> LineWebhookResponse:
+    has_previous = payload.user_id in USER_CONTEXT
     parsed = parse_line_message(payload)
+    follow_up = _should_ask_follow_up(payload, parsed, has_previous)
+    if follow_up:
+        USER_CONTEXT[payload.user_id] = parsed
+        _, prompt = follow_up
+        return LineWebhookResponse(reply_text=prompt, actions=[], booking_intents=[])
+    USER_CONTEXT[payload.user_id] = parsed
     search_and_probe = await run_search_and_probe(
         SearchAndProbeRequest(
             message=parsed.query,
@@ -468,6 +515,7 @@ async def run_line_query(payload: LineWebhookRequest) -> LineWebhookResponse:
             party_size=parsed.party_size,
             reservation_date=parsed.reservation_date,
             preferred_time=parsed.preferred_time,
+            cuisine_type=parsed.cuisine_tag,
             limit=payload.limit,
         )
     )

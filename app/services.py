@@ -33,6 +33,25 @@ LOCATION_TRANSLATIONS = {
     "\u4e2d\u5c71\u5340": "Zhongshan District",
 }
 
+CUISINE_KEYWORD_RULES = {
+    "\u4e32\u71d2": {
+        "include": ["\u4e32\u71d2", "\u71d2\u9ce5", "\u5c45\u9152\u5c4b", "yakitori", "skewer"],
+        "exclude": ["\u71d2\u8089", "\u70e4\u8089", "yakiniku", "bbq", "barbecue"],
+    },
+    "\u71d2\u8089": {
+        "include": ["\u71d2\u8089", "\u70e4\u8089", "yakiniku", "bbq", "barbecue"],
+        "exclude": ["\u4e32\u71d2", "\u71d2\u9ce5", "\u5c45\u9152\u5c4b", "yakitori", "skewer"],
+    },
+    "\u706b\u934b": {
+        "include": ["\u706b\u934b", "\u934b\u7269", "hot pot", "shabu", "nabe"],
+        "exclude": ["\u71d2\u8089", "\u4e32\u71d2", "yakiniku", "yakitori"],
+    },
+    "\u751f\u9b5a\u7247": {
+        "include": ["\u751f\u9b5a\u7247", "\u58fd\u53f8", "sashimi", "omakase"],
+        "exclude": ["\u71d2\u8089", "\u4e32\u71d2", "\u706b\u934b"],
+    },
+}
+
 
 def _translate_text(value: str) -> str:
     translated = value
@@ -129,6 +148,52 @@ def _to_restaurant(place: dict) -> Restaurant:
     )
 
 
+def _normalize_text_for_match(*parts: str | None) -> str:
+    normalized = " ".join(part for part in parts if part)
+    return normalized.casefold()
+
+
+def _cuisine_match_score(restaurant: Restaurant, cuisine_tag: str | None) -> int:
+    if not cuisine_tag:
+        return 0
+
+    rule = CUISINE_KEYWORD_RULES.get(cuisine_tag)
+    if not rule:
+        return 0
+
+    haystack = _normalize_text_for_match(
+        restaurant.name,
+        restaurant.website_uri,
+        restaurant.formatted_address,
+    )
+    score = 0
+    for keyword in rule["include"]:
+        if keyword.casefold() in haystack:
+            score += 3
+    for keyword in rule["exclude"]:
+        if keyword.casefold() in haystack:
+            score -= 4
+    return score
+
+
+def _rank_restaurants(restaurants: list[Restaurant], cuisine_tag: str | None) -> list[Restaurant]:
+    ranked = sorted(
+        restaurants,
+        key=lambda restaurant: (
+            _cuisine_match_score(restaurant, cuisine_tag),
+            1 if restaurant.reservable else 0,
+            restaurant.rating or 0,
+            restaurant.user_rating_count or 0,
+        ),
+        reverse=True,
+    )
+    if cuisine_tag in CUISINE_KEYWORD_RULES:
+        positively_matched = [restaurant for restaurant in ranked if _cuisine_match_score(restaurant, cuisine_tag) > 0]
+        if positively_matched:
+            return positively_matched
+    return ranked
+
+
 async def search_restaurants(payload: SearchRequest) -> list[Restaurant]:
     client = PlacesClient()
 
@@ -145,6 +210,7 @@ async def search_restaurants(payload: SearchRequest) -> list[Restaurant]:
             if (restaurant.rating or 0) >= 4.0 and (restaurant.user_rating_count or 0) >= 50
         ]
         if qualified:
-            return qualified[: payload.limit]
+            ranked = _rank_restaurants(qualified, payload.cuisine_tag or payload.cuisine_type)
+            return ranked[: payload.limit]
 
     return []

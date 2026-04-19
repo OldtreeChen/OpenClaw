@@ -244,6 +244,23 @@ def test_parse_line_message_extracts_slash_date_and_compact_time_and_query_const
     assert parsed.query == "\u6709\u8349\u8766\u7684\u706b\u934b\u5403\u5230\u98fd"
 
 
+def test_parse_line_message_extracts_preferences_and_budget():
+    parsed = orchestrator.parse_line_message(
+        LineWebhookRequest(
+            user_id="u-pref",
+            message="\u4fe1\u7fa9\u5340 \u4e32\u71d2 \u5305\u5ec2 \u5b89\u975c \u4e0d\u8981\u592a\u8cb4",
+            location="\u53f0\u5317\u5e02",
+            party_size=4,
+        )
+    )
+
+    assert parsed.cuisine_tag == "\u4e32\u71d2"
+    assert "\u5305\u5ec2" in parsed.must_have_terms
+    assert "\u5b89\u975c" in parsed.preferred_terms
+    assert "\u4e0d\u8981\u592a\u8cb4" in parsed.avoid_terms
+    assert parsed.budget_level == 1
+
+
 def test_build_line_response_includes_summary_and_rating():
     result = SearchAndProbeResponse(
         query="\u706b\u934b",

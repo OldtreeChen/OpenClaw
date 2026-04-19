@@ -147,3 +147,81 @@ def test_search_restaurants_prefers_yakitori_over_generic_bbq(monkeypatch):
 
     assert result
     assert result[0].name == "\u9ce5\u54f2 \u71d2\u9ce5\u5c45\u9152\u5c4b"
+
+
+def test_search_restaurants_prefers_must_have_terms(monkeypatch):
+    class FakePlacesClient:
+        async def search_text(self, text_query: str, max_result_count: int = 5, language_code: str = "zh-TW"):
+            return [
+                {
+                    "id": "place-1",
+                    "displayName": {"text": "\u4e32\u71d2\u805a\u9910\u9928"},
+                    "rating": 4.9,
+                    "userRatingCount": 500,
+                    "websiteUri": "https://example.com/yakitori",
+                },
+                {
+                    "id": "place-2",
+                    "displayName": {"text": "\u4e32\u71d2\u5305\u5ec2\u5c45\u9152\u5c4b"},
+                    "rating": 4.5,
+                    "userRatingCount": 180,
+                    "websiteUri": "https://example.com/yakitori-private-room",
+                },
+            ]
+
+    monkeypatch.setattr(services, "PlacesClient", FakePlacesClient)
+
+    result = asyncio.run(
+        services.search_restaurants(
+            SearchRequest(
+                query="\u4e32\u71d2",
+                location="\u53f0\u5317\u5e02",
+                party_size=4,
+                limit=5,
+                cuisine_tag="\u4e32\u71d2",
+                must_have_terms=["\u5305\u5ec2"],
+            )
+        )
+    )
+
+    assert result
+    assert result[0].name == "\u4e32\u71d2\u5305\u5ec2\u5c45\u9152\u5c4b"
+
+
+def test_search_restaurants_filters_avoid_terms_when_possible(monkeypatch):
+    class FakePlacesClient:
+        async def search_text(self, text_query: str, max_result_count: int = 5, language_code: str = "zh-TW"):
+            return [
+                {
+                    "id": "place-1",
+                    "displayName": {"text": "\u71d2\u8089\u5403\u5230\u98fd"},
+                    "rating": 4.9,
+                    "userRatingCount": 500,
+                    "websiteUri": "https://example.com/yakiniku",
+                },
+                {
+                    "id": "place-2",
+                    "displayName": {"text": "\u4e32\u71d2\u5c45\u9152\u5c4b"},
+                    "rating": 4.6,
+                    "userRatingCount": 120,
+                    "websiteUri": "https://example.com/yakitori",
+                },
+            ]
+
+    monkeypatch.setattr(services, "PlacesClient", FakePlacesClient)
+
+    result = asyncio.run(
+        services.search_restaurants(
+            SearchRequest(
+                query="\u4e32\u71d2",
+                location="\u53f0\u5317\u5e02",
+                party_size=2,
+                limit=5,
+                cuisine_tag="\u4e32\u71d2",
+                avoid_terms=["\u4e0d\u8981\u71d2\u8089"],
+            )
+        )
+    )
+
+    assert result
+    assert result[0].name == "\u4e32\u71d2\u5c45\u9152\u5c4b"

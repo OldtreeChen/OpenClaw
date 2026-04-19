@@ -12,6 +12,9 @@ class SearchRequest(BaseModel):
     dining_time: Optional[str] = Field(default=None, description="ISO 8601 datetime string")
     cuisine_type: Optional[str] = None
     cuisine_tag: Optional[str] = None
+    must_have_terms: list[str] = Field(default_factory=list)
+    preferred_terms: list[str] = Field(default_factory=list)
+    avoid_terms: list[str] = Field(default_factory=list)
     budget_level: Optional[int] = Field(default=None, ge=1, le=4)
     limit: int = Field(default=5, ge=1, le=10)
 
@@ -110,6 +113,10 @@ class SearchAndProbeRequest(BaseModel):
     reservation_date: Optional[str] = Field(default=None, description="YYYY-MM-DD")
     preferred_time: Optional[str] = Field(default=None, description="HH:MM")
     cuisine_type: Optional[str] = None
+    must_have_terms: list[str] = Field(default_factory=list)
+    preferred_terms: list[str] = Field(default_factory=list)
+    avoid_terms: list[str] = Field(default_factory=list)
+    budget_level: Optional[int] = Field(default=None, ge=1, le=4)
     limit: int = Field(default=5, ge=1, le=10)
     max_parallel: int = Field(default=3, ge=1, le=10)
     probe_timeout_sec: int = Field(default=10, ge=3, le=45)

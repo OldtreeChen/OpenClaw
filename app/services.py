@@ -51,6 +51,15 @@ CUISINE_KEYWORD_RULES = {
         "exclude": ["\u71d2\u8089", "\u4e32\u71d2", "\u706b\u934b"],
     },
 }
+TERM_NORMALIZATION = {
+    "\u4e0d\u8981\u71d2\u8089": "\u71d2\u8089",
+    "\u4e0d\u8981\u592a\u8cb4": "\u5e73\u50f9",
+    "\u5403\u5230\u98fd": "\u5403\u5230\u98fd",
+    "\u5305\u5ec2": "\u5305\u5ec2",
+    "\u5b89\u975c": "\u5b89\u975c",
+    "\u8349\u8766": "\u8349\u8766",
+    "\u548c\u725b": "\u548c\u725b",
+}
 
 
 def _translate_text(value: str) -> str:
@@ -153,6 +162,30 @@ def _normalize_text_for_match(*parts: str | None) -> str:
     return normalized.casefold()
 
 
+def _term_match_score(restaurant: Restaurant, terms: list[str], weight: int) -> int:
+    haystack = _normalize_text_for_match(
+        restaurant.name,
+        restaurant.website_uri,
+        restaurant.formatted_address,
+    )
+    score = 0
+    for term in terms:
+        normalized_term = TERM_NORMALIZATION.get(term, term)
+        if normalized_term.casefold() in haystack:
+            score += weight
+    return score
+
+
+def _budget_score(restaurant: Restaurant, budget_level: int | None) -> int:
+    if not budget_level or restaurant.price_level is None:
+        return 0
+    if budget_level <= 2:
+        return max(0, 3 - restaurant.price_level)
+    if budget_level >= 4:
+        return restaurant.price_level
+    return 0
+
+
 def _cuisine_match_score(restaurant: Restaurant, cuisine_tag: str | None) -> int:
     if not cuisine_tag:
         return 0
@@ -194,6 +227,52 @@ def _rank_restaurants(restaurants: list[Restaurant], cuisine_tag: str | None) ->
     return ranked
 
 
+def _rank_restaurants_with_preferences(restaurants: list[Restaurant], payload: SearchRequest) -> list[Restaurant]:
+    ranked = sorted(
+        restaurants,
+        key=lambda restaurant: (
+            _cuisine_match_score(restaurant, payload.cuisine_tag or payload.cuisine_type),
+            _term_match_score(restaurant, payload.must_have_terms, 5)
+            + _term_match_score(restaurant, payload.preferred_terms, 2)
+            - _term_match_score(restaurant, payload.avoid_terms, 6),
+            _budget_score(restaurant, payload.budget_level),
+            1 if restaurant.reservable else 0,
+            restaurant.rating or 0,
+            restaurant.user_rating_count or 0,
+        ),
+        reverse=True,
+    )
+
+    if payload.must_have_terms:
+        strongly_matched = [
+            restaurant
+            for restaurant in ranked
+            if _term_match_score(restaurant, payload.must_have_terms, 1) > 0
+        ]
+        if strongly_matched:
+            ranked = strongly_matched
+
+    if payload.avoid_terms:
+        clean = [
+            restaurant
+            for restaurant in ranked
+            if _term_match_score(restaurant, payload.avoid_terms, 1) == 0
+        ]
+        if clean:
+            ranked = clean
+
+    if payload.cuisine_tag in CUISINE_KEYWORD_RULES:
+        positively_matched = [
+            restaurant
+            for restaurant in ranked
+            if _cuisine_match_score(restaurant, payload.cuisine_tag or payload.cuisine_type) > 0
+        ]
+        if positively_matched:
+            ranked = positively_matched
+
+    return ranked
+
+
 async def search_restaurants(payload: SearchRequest) -> list[Restaurant]:
     client = PlacesClient()
 
@@ -210,7 +289,7 @@ async def search_restaurants(payload: SearchRequest) -> list[Restaurant]:
             if (restaurant.rating or 0) >= 4.0 and (restaurant.user_rating_count or 0) >= 50
         ]
         if qualified:
-            ranked = _rank_restaurants(qualified, payload.cuisine_tag or payload.cuisine_type)
+            ranked = _rank_restaurants_with_preferences(qualified, payload)
             return ranked[: payload.limit]
 
     return []

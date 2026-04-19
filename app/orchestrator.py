@@ -95,6 +95,30 @@ FOLLOW_UP_HINTS = {
     "location": "\u4f60\u60f3\u627e\u54ea\u500b\u5730\u5340\uff1f\u4f8b\u5982\u4fe1\u7fa9\u5340\u3001\u53f0\u5317\u5e02\u3001\u8606\u6d32\u5340\u3002",
     "time": "\u60f3\u7d04\u4ec0\u9ebc\u6642\u9593\uff1f\u4f8b\u5982\u4eca\u665a 7 \u9ede\u3001\u660e\u5929\u665a\u4e0a 6 \u9ede\u3002",
 }
+MUST_HAVE_KEYWORDS = [
+    "\u8349\u8766",
+    "\u548c\u725b",
+    "\u5305\u5ec2",
+    "\u5403\u5230\u98fd",
+    "\u89aa\u5b50",
+    "\u5bf5\u7269",
+]
+PREFERRED_KEYWORDS = [
+    "\u5b89\u975c",
+    "\u805a\u9910",
+    "\u5c45\u9152\u5c4b",
+    "\u666f\u89c0",
+    "\u5ea7\u4f4d\u5bec\u655e",
+]
+AVOID_KEYWORDS = [
+    "\u4e0d\u8981\u592a\u8cb4",
+    "\u4e0d\u8981\u6392\u968a",
+    "\u4e0d\u5403\u725b",
+    "\u4e0d\u8981\u71d2\u8089",
+    "\u4e0d\u8981\u5435",
+]
+LOW_BUDGET_HINTS = ["\u4e0d\u8981\u592a\u8cb4", "\u4fbf\u5b9c", "\u5e73\u50f9"]
+HIGH_BUDGET_HINTS = ["\u9ad8\u7d1a", "\u7cbe\u7dfb", "\u6176\u751f", "\u7d04\u6703"]
 
 
 @dataclass
@@ -105,12 +129,28 @@ class ParsedMessage:
     reservation_date: str
     preferred_time: str | None
     cuisine_tag: str | None = None
+    must_have_terms: list[str] | None = None
+    preferred_terms: list[str] | None = None
+    avoid_terms: list[str] | None = None
+    budget_level: int | None = None
 
 
 def _extract_cuisine_tag(message: str) -> str | None:
     for keyword in CUISINE_KEYWORDS:
         if keyword in message:
             return keyword
+    return None
+
+
+def _extract_terms(message: str, keywords: list[str]) -> list[str]:
+    return [keyword for keyword in keywords if keyword in message]
+
+
+def _extract_budget_level(message: str) -> int | None:
+    if any(keyword in message for keyword in LOW_BUDGET_HINTS):
+        return 1
+    if any(keyword in message for keyword in HIGH_BUDGET_HINTS):
+        return 4
     return None
 
 
@@ -271,6 +311,10 @@ def parse_line_message(payload: LineWebhookRequest) -> ParsedMessage:
         reservation_date=_extract_date(payload.message, previous.reservation_date if previous else payload.reservation_date),
         preferred_time=inferred_time or (previous.preferred_time if previous else None),
         cuisine_tag=cuisine_tag,
+        must_have_terms=_extract_terms(payload.message, MUST_HAVE_KEYWORDS) or (previous.must_have_terms if previous else []),
+        preferred_terms=_extract_terms(payload.message, PREFERRED_KEYWORDS) or (previous.preferred_terms if previous else []),
+        avoid_terms=_extract_terms(payload.message, AVOID_KEYWORDS) or (previous.avoid_terms if previous else []),
+        budget_level=_extract_budget_level(payload.message) or (previous.budget_level if previous else None),
     )
     return parsed
 
@@ -300,6 +344,10 @@ def _compose_search_payload(payload: SearchAndProbeRequest) -> SearchRequest:
         dining_time=dining_time,
         cuisine_type=payload.cuisine_type,
         cuisine_tag=payload.cuisine_type,
+        must_have_terms=payload.must_have_terms,
+        preferred_terms=payload.preferred_terms,
+        avoid_terms=payload.avoid_terms,
+        budget_level=payload.budget_level,
         limit=payload.limit,
     )
 
@@ -463,6 +511,10 @@ def build_line_response(payload: LineWebhookRequest, result: SearchAndProbeRespo
             reason.append("\u53ef\u76f4\u63a5\u8a02\u4f4d")
         if item.available_times:
             reason.append("\u6293\u5230\u5019\u9078\u6642\u6bb5")
+        query_text = result.query
+        for term in ("\u8349\u8766", "\u548c\u725b", "\u5305\u5ec2", "\u5403\u5230\u98fd", "\u5b89\u975c"):
+            if term in query_text:
+                reason.append(f"\u8cbc\u8fd1「{term}」\u9700\u6c42")
         reason_text = "\uff0c".join(reason) if reason else "\u689d\u4ef6\u76f8\u8fd1"
 
         lines.append(
@@ -516,6 +568,10 @@ async def run_line_query(payload: LineWebhookRequest) -> LineWebhookResponse:
             reservation_date=parsed.reservation_date,
             preferred_time=parsed.preferred_time,
             cuisine_type=parsed.cuisine_tag,
+            budget_level=parsed.budget_level,
+            must_have_terms=parsed.must_have_terms,
+            preferred_terms=parsed.preferred_terms,
+            avoid_terms=parsed.avoid_terms,
             limit=payload.limit,
         )
     )
